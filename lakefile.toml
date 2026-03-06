@@ -1,0 +1,15 @@
+name = "RyuLean4"
+version = "0.1.0"
+defaultTargets = ["ryulean4"]
+
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4"
+tag = "v4.28.0"
+
+[[lean_lib]]
+name = "RyuLean4"
+
+[[lean_exe]]
+name = "ryulean4"
+root = "Main"
