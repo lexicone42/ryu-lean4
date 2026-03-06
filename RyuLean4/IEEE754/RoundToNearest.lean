@@ -74,11 +74,4 @@ def roundToNearestEven (q : ℚ) : F64 :=
       | some x => x
       | none => if s then negInf else posInf
 
-/-- The projection property for non-zero finite F64: rounding the value
-    back gives the same F64. For zero, toRat maps both ±0 to 0 : ℚ,
-    but roundToNearestEven(0) = posZero, so the roundtrip only works
-    for posZero. The sign is preserved separately via the Decimal. -/
-axiom round_nearest_nonzero (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :
-    roundToNearestEven (x.toRat) = x
-
 end F64
