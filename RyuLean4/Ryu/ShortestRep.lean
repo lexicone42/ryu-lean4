@@ -121,15 +121,21 @@ theorem findDigits_well_formed (iv : AcceptanceInterval) (s : Bool)
     | exact mkStrippedDecimal_well_formed _ _ _
     | exact ih (n + 1)
 
-/-- Compute the shortest decimal for a finite F64 (specification level). -/
+/-- Compute the shortest decimal for a finite F64 (specification level).
+    For negative x, the interval [low, high] has low ≤ high < 0,
+    so |low| > |high|. We need sorted absolute bounds for findDigits,
+    with correspondingly swapped inclusivity flags. -/
 def shortestDecimal (x : F64) (hfin : x.isFinite) : Decimal :=
   let iv := schubfachInterval x hfin
   let s := x.sign
   if x.toRat = 0 then ⟨s, 0, 0⟩
   else
-    let absLow := |iv.low|
-    let absHigh := |iv.high|
-    findDigits iv s absLow absHigh 1 20
+    let absIv : AcceptanceInterval :=
+      if s then
+        { low := -iv.high, high := -iv.low,
+          lowInclusive := iv.highInclusive, highInclusive := iv.lowInclusive }
+      else iv
+    findDigits absIv s absIv.low absIv.high 1 1024
 
 /-- The Ryu algorithm: F64 → shortest Decimal. -/
 def ryu (x : F64) (hfin : x.isFinite) : Decimal :=
