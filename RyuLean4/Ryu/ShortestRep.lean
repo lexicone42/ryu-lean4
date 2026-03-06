@@ -155,9 +155,30 @@ theorem ryu_well_formed (x : F64) (hfin : x.isFinite) :
   · exact ⟨fun h => absurd rfl h, fun _ => rfl⟩
   · exact findDigits_well_formed _ _ _ _ _ _
 
-/-- For non-zero x, ryu produces non-zero digits. -/
-axiom ryu_nonzero_digits (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :
-    (ryu x hfin).digits ≠ 0
+private theorem digits_zero_imp_toRat_zero (d : Decimal) (h : d.digits = 0) :
+    d.toRat = 0 := by
+  unfold Decimal.toRat; simp [h]
+
+private theorem round_zero : F64.roundToNearestEven 0 = F64.posZero := by
+  unfold F64.roundToNearestEven; simp
+
+private theorem posZero_toRat : F64.posZero.toRat = 0 := by
+  unfold F64.posZero F64.toRat F64.isFinite F64.effectiveSignificand; simp
+
+/-- For non-zero x, ryu produces non-zero digits.
+    Proof: if digits were 0, then toRat = 0. Since ryu's output is in the
+    acceptance interval, 0 would be in the interval. By interval soundness,
+    roundToNearestEven 0 = x, but that gives posZero = x, contradicting x.toRat ≠ 0. -/
+theorem ryu_nonzero_digits (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :
+    (ryu x hfin).digits ≠ 0 := by
+  intro h_zero
+  have h_rat_zero := digits_zero_imp_toRat_zero _ h_zero
+  have h_in := ryu_in_interval x hfin hne
+  unfold isValidRep at h_in
+  rw [h_rat_zero] at h_in
+  have h_round := schubfach_interval_correct x hfin 0 h_in
+  rw [round_zero] at h_round
+  exact hne (by rw [← h_round]; exact posZero_toRat)
 
 /-- effectiveSignificand = 0 iff the float is ±0. -/
 private theorem effectiveSig_zero_iff (x : F64) (_hfin : x.isFinite) :
