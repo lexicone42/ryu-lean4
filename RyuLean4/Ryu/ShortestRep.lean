@@ -27,6 +27,100 @@ def stripTrailingZeros (n : Nat) : Nat × Nat :=
   else (n, 0)
 termination_by n
 
+theorem strip_no_trailing (n : Nat) :
+    (stripTrailingZeros n).1 ≠ 0 → (stripTrailingZeros n).1 % 10 ≠ 0 := by
+  induction n using Nat.strongRecOn with
+  | _ n ih =>
+    unfold stripTrailingZeros
+    split
+    · simp
+    · next hn =>
+      split
+      · next hmod =>
+        have hdiv : n / 10 < n := Nat.div_lt_self (by omega) (by omega)
+        show (stripTrailingZeros (n / 10)).1 ≠ 0 → (stripTrailingZeros (n / 10)).1 % 10 ≠ 0
+        exact ih (n / 10) hdiv
+      · next hmod =>
+        simp only []
+        intro; exact hmod
+
+theorem strip_zero_iff (n : Nat) :
+    (stripTrailingZeros n).1 = 0 ↔ n = 0 := by
+  induction n using Nat.strongRecOn with
+  | _ n ih =>
+    unfold stripTrailingZeros
+    split
+    · next h => exact ⟨fun _ => h, fun _ => by simp⟩
+    · next hn =>
+      split
+      · next hmod =>
+        have hdiv : n / 10 < n := Nat.div_lt_self (by omega) (by omega)
+        show (stripTrailingZeros (n / 10)).1 = 0 ↔ n = 0
+        rw [ih (n / 10) hdiv]
+        constructor
+        · intro h; omega
+        · intro h; exact absurd h hn
+      · simp [hn]
+
+theorem strip_of_zero : stripTrailingZeros 0 = (0, 0) := by
+  unfold stripTrailingZeros; simp
+
+/-- Strip trailing zeros and produce a well-formed Decimal. -/
+def mkStrippedDecimal (s : Bool) (d : Nat) (e : Int) : Decimal :=
+  let p := stripTrailingZeros d
+  if p.1 = 0 then ⟨s, 0, 0⟩
+  else ⟨s, p.1, e + p.2⟩
+
+theorem mkStrippedDecimal_well_formed (s : Bool) (d : Nat) (e : Int) :
+    (mkStrippedDecimal s d e).WellFormed := by
+  unfold mkStrippedDecimal
+  simp only []
+  split
+  · exact ⟨fun h => absurd rfl h, fun _ => rfl⟩
+  · next h =>
+    exact ⟨fun _ => strip_no_trailing d h, fun h' => absurd h' h⟩
+
+/-- Find shortest digit representation by trying increasing digit counts. -/
+def findDigits (iv : AcceptanceInterval) (s : Bool)
+    (absLow absHigh : ℚ) (n : Nat) (fuel : Nat) : Decimal :=
+  match fuel with
+  | 0 => ⟨false, 0, 0⟩
+  | fuel' + 1 =>
+    let scale : ℚ := 10 ^ (n - 1)
+    let scaledLow := absLow * scale
+    let scaledHigh := absHigh * scale
+    let dLow : Nat := if iv.lowInclusive then
+      scaledLow.ceil.toNat
+    else
+      scaledLow.floor.toNat + 1
+    let dHigh : Nat := if iv.highInclusive then
+      scaledHigh.floor.toNat
+    else
+      (scaledHigh.ceil - 1).toNat
+    if dLow ≤ dHigh then
+      let center := (absLow + absHigh) / 2
+      let scaledCenter := center * scale
+      let dCenter := scaledCenter.floor.toNat
+      let d := max dLow (min dCenter dHigh)
+      mkStrippedDecimal s d (-(n - 1 : Nat))
+    else
+      findDigits iv s absLow absHigh (n + 1) fuel'
+termination_by fuel
+
+theorem findDigits_well_formed (iv : AcceptanceInterval) (s : Bool)
+    (absLow absHigh : ℚ) (n fuel : Nat) :
+    (findDigits iv s absLow absHigh n fuel).WellFormed := by
+  induction fuel generalizing n with
+  | zero =>
+    unfold findDigits
+    exact ⟨fun h => absurd rfl h, fun _ => rfl⟩
+  | succ fuel' ih =>
+    unfold findDigits
+    simp only []
+    split <;> split <;> split <;> first
+    | exact mkStrippedDecimal_well_formed _ _ _
+    | exact ih (n + 1)
+
 /-- Compute the shortest decimal for a finite F64 (specification level). -/
 def shortestDecimal (x : F64) (hfin : x.isFinite) : Decimal :=
   let iv := schubfachInterval x hfin
@@ -35,32 +129,7 @@ def shortestDecimal (x : F64) (hfin : x.isFinite) : Decimal :=
   else
     let absLow := |iv.low|
     let absHigh := |iv.high|
-    let rec findDigits (n : Nat) (fuel : Nat) : Decimal :=
-      match fuel with
-      | 0 => ⟨false, 0, 0⟩
-      | fuel' + 1 =>
-        let scale : ℚ := 10 ^ (n - 1)
-        let scaledLow := absLow * scale
-        let scaledHigh := absHigh * scale
-        let dLow : Nat := if iv.lowInclusive then
-          scaledLow.ceil.toNat
-        else
-          scaledLow.floor.toNat + 1
-        let dHigh : Nat := if iv.highInclusive then
-          scaledHigh.floor.toNat
-        else
-          (scaledHigh.ceil - 1).toNat
-        if dLow ≤ dHigh then
-          let center := (absLow + absHigh) / 2
-          let scaledCenter := center * scale
-          let dCenter := scaledCenter.floor.toNat
-          let d := max dLow (min dCenter dHigh)
-          let (d', extra) := stripTrailingZeros d
-          ⟨s, d', -(n - 1 : Nat) + extra⟩
-        else
-          findDigits (n + 1) fuel'
-    termination_by fuel
-    findDigits 1 20
+    findDigits iv s absLow absHigh 1 20
 
 /-- The Ryu algorithm: F64 → shortest Decimal. -/
 def ryu (x : F64) (hfin : x.isFinite) : Decimal :=
@@ -72,8 +141,13 @@ axiom ryu_in_interval (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :
     isValidRep (ryu x hfin) x hfin
 
 /-- Ryu produces well-formed Decimals. -/
-axiom ryu_well_formed (x : F64) (hfin : x.isFinite) :
-    (ryu x hfin).WellFormed
+theorem ryu_well_formed (x : F64) (hfin : x.isFinite) :
+    (ryu x hfin).WellFormed := by
+  unfold ryu shortestDecimal
+  simp only []
+  split
+  · exact ⟨fun h => absurd rfl h, fun _ => rfl⟩
+  · exact findDigits_well_formed _ _ _ _ _ _
 
 /-- For non-zero x, ryu produces non-zero digits. -/
 axiom ryu_nonzero_digits (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :

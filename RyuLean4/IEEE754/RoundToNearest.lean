@@ -19,7 +19,7 @@ def mkFinite (s : Bool) (bexp : Nat) (mant : Nat) : Option F64 :=
 
 /-- Find the biased exponent for a non-negative rational.
     Specification-level: iterate downward from 2046. -/
-private def findBiasedExp (qAbs : ℚ) : Nat :=
+def findBiasedExp (qAbs : ℚ) : Nat :=
   let rec go (e : Nat) : Nat :=
     if e = 0 then 0
     else
@@ -34,7 +34,7 @@ private def findBiasedExp (qAbs : ℚ) : Nat :=
 /-- Round a non-negative rational to the nearest significand
     for a given biased exponent, with round-to-nearest-even.
     Returns (mantissa, bumpExponent). -/
-private def roundSignificand (qAbs : ℚ) (bexp : Nat) : Nat × Bool :=
+def roundSignificand (qAbs : ℚ) (bexp : Nat) : Nat × Bool :=
   let binExp : Int :=
     if bexp = 0 then -1074
     else (bexp : Int) - 1075
