@@ -11,12 +11,12 @@ import RyuLean4.Decimal.Decimal
 namespace Decimal
 
 /-- Parse a single decimal digit character to its value. -/
-private def parseDigitChar (c : Char) : Option Nat :=
+def parseDigitChar (c : Char) : Option Nat :=
   if '0' ≤ c && c ≤ '9' then some (c.toNat - '0'.toNat)
   else none
 
 /-- Parse a sequence of digit chars to a natural number. -/
-private def parseNat (chars : List Char) : Option (Nat × List Char) :=
+def parseNat (chars : List Char) : Option (Nat × List Char) :=
   let rec go (chars : List Char) (acc : Nat) (consumed : Bool) : Option (Nat × List Char) :=
     match chars with
     | [] => if consumed then some (acc, []) else none
@@ -27,7 +27,7 @@ private def parseNat (chars : List Char) : Option (Nat × List Char) :=
   go chars 0 false
 
 /-- Parse an integer (possibly negative). -/
-private def parseInt (chars : List Char) : Option (Int × List Char) :=
+def parseInt (chars : List Char) : Option (Int × List Char) :=
   match chars with
   | '-' :: rest =>
     match parseNat rest with

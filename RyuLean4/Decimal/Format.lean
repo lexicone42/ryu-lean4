@@ -21,7 +21,7 @@ import RyuLean4.Decimal.Decimal
 namespace Decimal
 
 /-- Convert a Nat to its decimal digit characters. -/
-private def natToDigits (n : Nat) : List Char :=
+def natToDigits (n : Nat) : List Char :=
   if n = 0 then ['0']
   else
     let rec go (n : Nat) (acc : List Char) : List Char :=
@@ -31,7 +31,7 @@ private def natToDigits (n : Nat) : List Char :=
     go n []
 
 /-- Convert an Int to decimal string chars (with optional minus). -/
-private def intToDigits (n : Int) : List Char :=
+def intToDigits (n : Int) : List Char :=
   match n with
   | .ofNat n => natToDigits n
   | .negSucc n => '-' :: natToDigits (n + 1)
