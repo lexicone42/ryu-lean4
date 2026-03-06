@@ -36,15 +36,18 @@ def toRat (d : Decimal) : ℚ :=
   else
     signMul * d.digits / (10 ^ (-d.exponent).toNat : ℚ)
 
-/-- Convert a Decimal to F64 via rounding. -/
+/-- Convert a Decimal to F64 via rounding.
+    For zero digits, construct the F64 directly (preserving sign).
+    This is needed because ℚ has no signed zero. -/
 def toF64 (d : Decimal) : F64 :=
-  F64.roundToNearestEven d.toRat
+  if d.digits = 0 then ⟨d.sign, ⟨0, by omega⟩, ⟨0, by omega⟩⟩
+  else F64.roundToNearestEven d.toRat
 
 /-- A Decimal is well-formed if:
     1. Non-zero digits have no trailing zeros (digits % 10 ≠ 0)
-    2. sign is false when digits = 0 -/
+    2. exponent is 0 when digits = 0 -/
 def WellFormed (d : Decimal) : Prop :=
   (d.digits ≠ 0 → d.digits % 10 ≠ 0) ∧
-  (d.digits = 0 → d.sign = false)
+  (d.digits = 0 → d.exponent = 0)
 
 end Decimal

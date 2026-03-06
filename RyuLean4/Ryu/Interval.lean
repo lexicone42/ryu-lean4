@@ -40,16 +40,17 @@ def f64Succ (x : F64) : F64 :=
   else
     ⟨x.sign, ⟨2047, by omega⟩, ⟨0, by omega⟩⟩
 
-/-- Compute the acceptance interval for a finite F64 value. -/
+/-- Compute the acceptance interval for a finite F64 value.
+    Uses min/max to ensure low ≤ high for both positive and negative floats. -/
 def schubfachInterval (x : F64) (_hfin : x.isFinite) : AcceptanceInterval :=
   let xVal := x.toRat
   let xPrev := f64Pred x
   let xNext := f64Succ x
-  let low := (xPrev.toRat + xVal) / 2
-  let high := (xVal + xNext.toRat) / 2
+  let bound1 := (xPrev.toRat + xVal) / 2
+  let bound2 := (xVal + xNext.toRat) / 2
   let mantEven := x.mantissa.val % 2 = 0
-  { low := low
-    high := high
+  { low := min bound1 bound2
+    high := max bound1 bound2
     lowInclusive := mantEven
     highInclusive := mantEven }
 
