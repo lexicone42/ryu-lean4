@@ -60,4 +60,14 @@ axiom schubfach_interval_correct (x : F64) (hfin : x.isFinite)
     (q : ℚ) (hq : (schubfachInterval x hfin).contains q) :
     F64.roundToNearestEven q = x
 
+/-- The absolute interval (negated/swapped for negative floats) has
+    strictly positive bounds with low < high. -/
+axiom schubfach_abs_interval_pos (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :
+    let iv := schubfachInterval x hfin
+    let absIv := if x.sign then
+      { low := -iv.high, high := -iv.low,
+        lowInclusive := iv.highInclusive, highInclusive := iv.lowInclusive : AcceptanceInterval }
+    else iv
+    0 < absIv.low ∧ absIv.low < absIv.high
+
 end Ryu
