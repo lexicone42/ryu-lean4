@@ -19,7 +19,7 @@ def mkFinite (s : Bool) (bexp : Nat) (mant : Nat) : Option F64 :=
 
 /-- Find the biased exponent for a non-negative rational.
     Specification-level: iterate downward from 2046. -/
-private def findBiasedExp (qAbs : ℚ) : Nat :=
+def findBiasedExp (qAbs : ℚ) : Nat :=
   let rec go (e : Nat) : Nat :=
     if e = 0 then 0
     else
@@ -34,7 +34,7 @@ private def findBiasedExp (qAbs : ℚ) : Nat :=
 /-- Round a non-negative rational to the nearest significand
     for a given biased exponent, with round-to-nearest-even.
     Returns (mantissa, bumpExponent). -/
-private def roundSignificand (qAbs : ℚ) (bexp : Nat) : Nat × Bool :=
+def roundSignificand (qAbs : ℚ) (bexp : Nat) : Nat × Bool :=
   let binExp : Int :=
     if bexp = 0 then -1074
     else (bexp : Int) - 1075
@@ -73,10 +73,5 @@ def roundToNearestEven (q : ℚ) : F64 :=
       match mkFinite s finalExp mant with
       | some x => x
       | none => if s then negInf else posInf
-
-/-- The projection property: rounding the value of a finite F64 back gives
-    the same F64. Axiomatized — proof requires detailed interval arithmetic. -/
-axiom round_nearest_idempotent (x : F64) (hfin : x.isFinite) :
-    roundToNearestEven (x.toRat) = x
 
 end F64
