@@ -346,15 +346,175 @@ private theorem abs_bounds_to_contains_neg (iv : AcceptanceInterval) (r : ℚ)
   · cases hli : iv.lowInclusive <;> cases hhi' : iv.highInclusive <;>
       simp only [hhi', ↓reduceIte, Bool.false_eq_true] at hlo ⊢ <;> linarith
 
-/-- Fuel sufficiency: 1024 iterations is enough for findDigits to find a
-    matching digit count for any finite non-zero F64. -/
-axiom schubfach_fuel_sufficient (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :
+-- ============ Fuel sufficiency proof ============
+
+-- Helper: width ≥ 2 implies the findDigits Nat-level dLow ≤ dHigh condition
+private theorem width_implies_cond
+    (lo hi : ℚ) (hlo : 0 < lo) (n : Nat)
+    (hwidth : (hi - lo) * (10:ℚ)^(n-1) ≥ 2)
+    (lowIncl highIncl : Bool) :
+    (if lowIncl then (lo * (10:ℚ)^(n-1)).ceil.toNat
+     else (lo * (10:ℚ)^(n-1)).floor.toNat + 1) ≤
+    (if highIncl then (hi * (10:ℚ)^(n-1)).floor.toNat
+     else ((hi * (10:ℚ)^(n-1)).ceil - 1).toNat) := by
+  set scale := (10:ℚ)^(n-1)
+  have hscale_pos : 0 < scale := by positivity
+  have hlo_s : 0 < lo * scale := mul_pos hlo hscale_pos
+  have hhi_s : 0 < hi * scale := by nlinarith
+  have h_flo_nn : 0 ≤ ⌊lo * scale⌋ := Int.floor_nonneg.mpr (le_of_lt hlo_s)
+  have h_clo_nn : 0 ≤ ⌈lo * scale⌉ := le_trans h_flo_nn (Int.floor_le_ceil _)
+  have h_chi_pos : 1 ≤ ⌈hi * scale⌉ := Int.one_le_ceil_iff.mpr hhi_s
+  have h_fhi_nn : 0 ≤ ⌊hi * scale⌋ := Int.floor_nonneg.mpr (le_of_lt hhi_s)
+  have h_clo' : ⌈lo * scale⌉ ≤ ⌊lo * scale⌋ + 1 := Int.ceil_le_floor_add_one _
+  have h_chi' : ⌈hi * scale⌉ ≤ ⌊hi * scale⌋ + 1 := Int.ceil_le_floor_add_one _
+  have hgap : ⌈hi * scale⌉ - ⌊lo * scale⌋ ≥ 2 := by
+    have h1 : hi * scale ≤ (⌈hi * scale⌉ : ℚ) := Int.le_ceil _
+    have h2 : (⌊lo * scale⌋ : ℚ) ≤ lo * scale := Int.floor_le _
+    exact_mod_cast (show (⌈hi * scale⌉ : ℚ) - (⌊lo * scale⌋ : ℚ) ≥ 2 by nlinarith)
+  have h_ceil_le : ⌈lo * scale⌉ ≤ ⌊hi * scale⌋ := by omega
+  have hint : (if lowIncl then ⌈lo * scale⌉ else ⌊lo * scale⌋ + 1) ≤
+              (if highIncl then ⌊hi * scale⌋ else ⌈hi * scale⌉ - 1) := by
+    cases lowIncl <;> cases highIncl <;>
+      simp only [↓reduceIte, Bool.false_eq_true] <;> omega
+  simp only [rat_ceil_eq, show ∀ q : ℚ, q.floor = ⌊q⌋ from fun _ => rfl]
+  cases lowIncl <;> cases highIncl <;>
+    simp only [↓reduceIte, Bool.false_eq_true] at hint ⊢ <;> omega
+
+-- If at any reachable step k the width condition holds, findDigits succeeds
+private theorem findDigits_succeeds_before
+    (iv : AcceptanceInterval) (s : Bool) (lo hi : ℚ)
+    (hlo : 0 < lo) (hhi : lo < hi) (n fuel : Nat) (hn : n ≥ 1)
+    (k : Nat) (hk_ge : k ≥ n) (hk_fuel : k < n + fuel)
+    (hwidth_k : (hi - lo) * (10:ℚ)^(k-1) ≥ 2) :
+    (findDigits iv s lo hi n fuel).digits ≠ 0 := by
+  induction fuel generalizing n with
+  | zero => omega
+  | succ fuel' ih =>
+    unfold findDigits; simp only []
+    by_cases hcond : (if iv.lowInclusive = true then (lo * 10 ^ (n - 1)).ceil.toNat
+                      else (lo * 10 ^ (n - 1)).floor.toNat + 1) ≤
+                     (if iv.highInclusive = true then (hi * 10 ^ (n - 1)).floor.toNat
+                      else ((hi * 10 ^ (n - 1)).ceil - 1).toNat)
+    · rw [if_pos hcond]
+      have hlo_s : 0 < lo * (10:ℚ)^(n-1) := mul_pos hlo (by positivity)
+      have h_ceil_pos : 1 ≤ (lo * (10:ℚ)^(n-1)).ceil := by
+        rw [rat_ceil_eq]; exact Int.one_le_ceil_iff.mpr hlo_s
+      have hdl_pos : 1 ≤ (if iv.lowInclusive = true then (lo * 10 ^ (n - 1)).ceil.toNat
+                          else (lo * 10 ^ (n - 1)).floor.toNat + 1) := by
+        cases iv.lowInclusive <;> simp only [↓reduceIte, Bool.false_eq_true]
+        · have : 0 ≤ (lo * (10:ℚ)^(n-1)).floor := by
+            change 0 ≤ ⌊lo * (10:ℚ)^(n-1)⌋; exact Int.floor_nonneg.mpr (le_of_lt hlo_s)
+          omega
+        · omega
+      have hd_ne : max (if iv.lowInclusive = true then (lo * 10 ^ (n - 1)).ceil.toNat
+                        else (lo * 10 ^ (n - 1)).floor.toNat + 1)
+                       (min ((lo + hi) / 2 * 10 ^ (n - 1)).floor.toNat
+                            (if iv.highInclusive = true then (hi * 10 ^ (n - 1)).floor.toNat
+                             else ((hi * 10 ^ (n - 1)).ceil - 1).toNat)) ≠ 0 := by omega
+      exact (mkStripped_nonzero_iff s _ _).mpr hd_ne
+    · rw [if_neg hcond]
+      have hk_gt : k > n := by
+        by_contra hle; push_neg at hle
+        have : k = n := by omega
+        subst this
+        exact absurd (width_implies_cond lo hi hlo k hwidth_k iv.lowInclusive iv.highInclusive) hcond
+      exact ih (n + 1) (by omega) (by omega) (by omega)
+
+private theorem effectiveBinaryExp_ge (x : F64) (_hfin : x.isFinite) :
+    x.effectiveBinaryExp ≥ -1074 := by
+  unfold F64.effectiveBinaryExp
+  simp only [F64.expBias, F64.mantBits]
+  split <;> omega
+
+private theorem ten_pow_ge_two_pow_three_mul (n : Nat) :
+    (10:ℚ)^n ≥ (2:ℚ)^(3*n) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    rw [pow_succ, show 3 * (n + 1) = 3 * n + 3 from by ring, pow_add]
+    nlinarith [show (0:ℚ) < 2^(3*n) from by positivity]
+
+private theorem effSig_pos_of_ne_zero (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :
+    x.effectiveSignificand ≥ 1 := by
+  by_contra h; push_neg at h
+  have : x.effectiveSignificand = 0 := by omega
+  exact hne (by unfold F64.toRat; rw [if_neg (not_not.mpr hfin)]; simp [this])
+
+private theorem abs_width_times_ten_pow (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :
     let iv := schubfachInterval x hfin
     let absIv := if x.sign then
       { low := -iv.high, high := -iv.low,
         lowInclusive := iv.highInclusive, highInclusive := iv.lowInclusive : AcceptanceInterval }
     else iv
-    (findDigits absIv x.sign absIv.low absIv.high 1 1024).digits ≠ 0
+    (absIv.high - absIv.low) * (10:ℚ)^359 ≥ 2 := by
+  simp only []
+  unfold schubfachInterval; simp only []
+  set e2 := x.effectiveBinaryExp - 2
+  set mf := x.effectiveSignificand
+  set delta := (if x.mantissa.val = 0 ∧ x.biasedExp.val > 1 then 1 else 2 : Nat)
+  set u := 4 * mf - delta
+  set w := 4 * mf + 2
+  have hmf := effSig_pos_of_ne_zero x hfin hne
+  have hdelta_le : delta ≤ 2 := by simp only [delta]; split <;> omega
+  have he2 : e2 ≥ -1076 := by
+    simp only [e2]; linarith [effectiveBinaryExp_ge x hfin]
+  have hwu_nat : w ≥ u + 3 := by simp only [u, w, delta]; split <;> omega
+  have hwu_cast : ((w:ℚ) - (u:ℚ)) ≥ 3 := by exact_mod_cast (show (w:ℤ) - (u:ℤ) ≥ 3 by omega)
+  suffices h : ((if e2 ≥ 0 then (w:ℚ) * (2:ℚ)^e2.toNat else (w:ℚ) / (2:ℚ)^(-e2).toNat) -
+               (if e2 ≥ 0 then (u:ℚ) * (2:ℚ)^e2.toNat else (u:ℚ) / (2:ℚ)^(-e2).toNat)) *
+              (10:ℚ)^359 ≥ 2 by
+    cases hs : x.sign <;> simp only [↓reduceIte, Bool.false_eq_true, neg_neg] <;> exact h
+  by_cases he : e2 ≥ 0
+  · simp only [if_pos he]
+    have h2ge : (2:ℚ)^e2.toNat ≥ 1 := one_le_pow₀ (by norm_num : (1:ℚ) ≤ 2)
+    have h10_pos : (0:ℚ) < (10:ℚ)^359 := by positivity
+    have hwidth_val : ((w:ℚ) * (2:ℚ)^e2.toNat - (u:ℚ) * (2:ℚ)^e2.toNat) ≥ 3 := by
+      rw [show ((w:ℚ) * (2:ℚ)^e2.toNat - (u:ℚ) * (2:ℚ)^e2.toNat) =
+          ((w:ℚ) - (u:ℚ)) * (2:ℚ)^e2.toNat from by ring]; nlinarith
+    have : ((w:ℚ) * (2:ℚ)^e2.toNat - (u:ℚ) * (2:ℚ)^e2.toNat) * (10:ℚ)^359 ≥ 3 :=
+      calc ((w:ℚ) * (2:ℚ)^e2.toNat - (u:ℚ) * (2:ℚ)^e2.toNat) * (10:ℚ)^359
+          ≥ 3 * (10:ℚ)^359 := mul_le_mul_of_nonneg_right hwidth_val (le_of_lt h10_pos)
+        _ ≥ 3 * 1 := mul_le_mul_of_nonneg_left
+            (one_le_pow₀ (by norm_num : (1:ℚ) ≤ 10)) (by norm_num : (0:ℚ) ≤ 3)
+        _ = 3 := by ring
+    exact le_trans (by norm_num : (2:ℚ) ≤ 3) this
+  · simp only [if_neg he]
+    have h2pos : (0:ℚ) < (2:ℚ)^(-e2).toNat := by positivity
+    rw [show (w:ℚ) / (2:ℚ)^(-e2).toNat - (u:ℚ) / (2:ℚ)^(-e2).toNat =
+        ((w:ℚ) - (u:ℚ)) / (2:ℚ)^(-e2).toNat from (sub_div _ _ _).symm]
+    rw [ge_iff_le, div_mul_eq_mul_div, le_div_iff₀ h2pos]
+    have h2_bound : (2:ℚ)^(-e2).toNat ≤ (2:ℚ)^1076 := by gcongr; norm_num; omega
+    have h10_bound : (10:ℚ)^359 ≥ (2:ℚ)^1077 := by
+      have := ten_pow_ge_two_pow_three_mul 359
+      rw [show 3 * 359 = 1077 from by norm_num] at this; exact this
+    have h2_1077 : (2:ℚ)^1077 = 2 * (2:ℚ)^1076 := by
+      rw [show (1077:Nat) = 1076 + 1 from by norm_num, pow_succ]; ring
+    calc 2 * (2:ℚ)^(-e2).toNat
+        ≤ 2 * (2:ℚ)^1076 := mul_le_mul_of_nonneg_left h2_bound (by norm_num)
+      _ = (2:ℚ)^1077 := h2_1077.symm
+      _ ≤ (10:ℚ)^359 := h10_bound
+      _ ≤ ((w:ℚ) - (u:ℚ)) * (10:ℚ)^359 :=
+          le_mul_of_one_le_left (le_of_lt (by positivity)) (by linarith)
+
+/-- Fuel sufficiency: 1024 iterations is enough for findDigits to find a
+    matching digit count for any finite non-zero F64. -/
+theorem schubfach_fuel_sufficient (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :
+    let iv := schubfachInterval x hfin
+    let absIv := if x.sign then
+      { low := -iv.high, high := -iv.low,
+        lowInclusive := iv.highInclusive, highInclusive := iv.lowInclusive : AcceptanceInterval }
+    else iv
+    (findDigits absIv x.sign absIv.low absIv.high 1 1024).digits ≠ 0 := by
+  simp only []
+  set iv := schubfachInterval x hfin
+  set absIv := if x.sign then
+    { low := -iv.high, high := -iv.low,
+      lowInclusive := iv.highInclusive, highInclusive := iv.lowInclusive : AcceptanceInterval }
+  else iv
+  have habs := schubfach_abs_interval_pos x hfin hne
+  simp only [] at habs
+  exact findDigits_succeeds_before absIv x.sign absIv.low absIv.high habs.1 habs.2
+    1 1024 (by omega) 360 (by omega) (by omega) (abs_width_times_ten_pow x hfin hne)
 
 /-- Compute the shortest decimal for a finite F64 (specification level).
     For negative x, the interval [low, high] has low ≤ high < 0,
