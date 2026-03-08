@@ -90,7 +90,7 @@ The formalization went through an axiom-reduction arc:
 
 - **Shortestness not proven** — `isShortestRep` is defined in `ShortestRep.lean` but no theorem connects it to `ryu`'s output. The algorithm tries digit counts in ascending order so it should find the shortest, but minimality is not formally established. The roundtrip guarantee is complete regardless.
 - **F64 is a mathematical model** — The `F64` structure is a pure Lean type, not connected to Lean's native `Float` or any hardware implementation. The proof applies to the model, which faithfully mirrors the IEEE 754 binary64 specification.
-- **6 `native_decide` uses** — All on concrete character comparisons (digits 0-9, sign characters) in `FormatParse.lean`. These are sound but trust the Lean compiler for evaluation.
+- **`native_decide` in `FormatParse.lean`** — Used for concrete character comparisons (digits 0-9, sign characters). Each syntactic occurrence fans out via `<;>` to multiple proof obligations. All are on small finite ground terms and are sound, but trust the Lean compiler for evaluation.
 
 ## Related work
 
