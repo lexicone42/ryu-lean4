@@ -617,7 +617,7 @@ theorem ryu_nonzero_digits (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :
   have h_in := ryu_in_interval x hfin hne
   unfold isValidRep at h_in
   rw [h_rat_zero] at h_in
-  have h_round := schubfach_interval_correct x hfin 0 h_in
+  have h_round := schubfach_interval_correct x hfin hne 0 h_in
   rw [round_zero] at h_round
   exact hne (by rw [← h_round]; exact posZero_toRat)
 
@@ -679,6 +679,6 @@ theorem ryu_roundtrip (x : F64) (hfin : x.isFinite) :
   · -- x is non-zero: ryu has non-zero digits, goes through roundToNearestEven
     have hd : (ryu x hfin).digits ≠ 0 := ryu_nonzero_digits x hfin h0
     simp [Decimal.toF64, hd]
-    exact schubfach_interval_correct x hfin _ (ryu_in_interval x hfin h0)
+    exact schubfach_interval_correct x hfin h0 _ (ryu_in_interval x hfin h0)
 
 end Ryu

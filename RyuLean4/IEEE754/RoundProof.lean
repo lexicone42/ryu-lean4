@@ -102,10 +102,10 @@ theorem toRat_abs (x : F64) (hfin : x.isFinite) :
 
 /-! ## findBiasedExp correctness -/
 
-private def threshQ (e : Nat) : ℚ :=
+def threshQ (e : Nat) : ℚ :=
   if e ≥ 1023 then (2 ^ (e - 1023) : ℚ) else 1 / (2 ^ (1023 - e) : ℚ)
 
-private theorem threshQ_le_of_le {a b : Nat} (h : a ≤ b) : threshQ a ≤ threshQ b := by
+theorem threshQ_le_of_le {a b : Nat} (h : a ≤ b) : threshQ a ≤ threshQ b := by
   rcases eq_or_lt_of_le h with rfl | hlt
   · exact le_rfl
   · unfold threshQ
@@ -125,7 +125,7 @@ private theorem threshQ_le_of_le {a b : Nat} (h : a ≤ b) : threshQ a ≤ thres
       exact inv_anti₀ (by positivity)
         (by exact_mod_cast Nat.pow_le_pow_right (by omega) (by omega))
 
-private theorem go_eq (qAbs : ℚ) (target : Nat) :
+theorem go_eq (qAbs : ℚ) (target : Nat) :
     ∀ start, target ≤ start →
       (target = 0 ∨ threshQ target ≤ qAbs) →
       (∀ e, target < e → e ≤ start → ¬(threshQ e ≤ qAbs)) →
@@ -152,17 +152,17 @@ private theorem go_eq (qAbs : ℚ) (target : Nat) :
         exact ih (start - 1) (by omega) (by omega) h_target
           (fun e he hle => h_above e he (by omega))
 
-private theorem ebe_normal (x : F64) (h : x.biasedExp.val ≠ 0) :
+theorem ebe_normal (x : F64) (h : x.biasedExp.val ≠ 0) :
     x.effectiveBinaryExp = (x.biasedExp.val : Int) - 1075 := by
   unfold effectiveBinaryExp expBias mantBits; split <;> omega
 
-private theorem esig_ge_52 (x : F64) (h : x.biasedExp.val ≥ 1) :
+theorem esig_ge_52 (x : F64) (h : x.biasedExp.val ≥ 1) :
     (x.effectiveSignificand : ℚ) ≥ 2^52 := by
   have : x.effectiveSignificand ≥ 2^52 := by
     unfold effectiveSignificand; simp only [mantBits]; split <;> omega
   exact_mod_cast this
 
-private theorem esig_lt_53 (x : F64) :
+theorem esig_lt_53 (x : F64) :
     (x.effectiveSignificand : ℚ) < 2^53 := by
   suffices h : x.effectiveSignificand < 2^53 from by exact_mod_cast h
   unfold effectiveSignificand; simp only [mantBits]
@@ -171,12 +171,12 @@ private theorem esig_lt_53 (x : F64) :
   · linarith [show (2:Nat)^52 < 2^53 from by norm_num]
   · linarith [show (2:Nat)^52 + 2^52 = 2^53 from by norm_num]
 
-private theorem esig_lt_52_sub (x : F64) (h : x.biasedExp.val = 0) :
+theorem esig_lt_52_sub (x : F64) (h : x.biasedExp.val = 0) :
     (x.effectiveSignificand : ℚ) < 2^52 := by
   suffices hh : x.effectiveSignificand < 2^52 by exact_mod_cast hh
   unfold effectiveSignificand; simp [h]
 
-private theorem lower_bound (x : F64) (hfin : x.isFinite) (hbexp : x.biasedExp.val ≥ 1) :
+theorem lower_bound (x : F64) (hfin : x.isFinite) (hbexp : x.biasedExp.val ≥ 1) :
     threshQ x.biasedExp.val ≤ |x.toRat| := by
   rw [toRat_abs x hfin]
   have hesig := esig_ge_52 x hbexp
@@ -214,7 +214,7 @@ private theorem lower_bound (x : F64) (hfin : x.isFinite) (hbexp : x.biasedExp.v
         _ ≤ ↑x.effectiveSignificand * 2^(1023 - x.biasedExp.val) :=
             mul_le_mul_of_nonneg_right hesig (by positivity)
 
-private theorem upper_bound_sub (x : F64) (hfin : x.isFinite)
+theorem upper_bound_sub (x : F64) (hfin : x.isFinite)
     (hbexp : x.biasedExp.val = 0) (_hne : x.toRat ≠ 0) :
     |x.toRat| < threshQ 1 := by
   rw [toRat_abs x hfin]
@@ -231,7 +231,7 @@ private theorem upper_bound_sub (x : F64) (hfin : x.isFinite)
       < 2^52 * 2^1022 := mul_lt_mul_of_pos_right hesig (by positivity)
     _ = 2^1074 := by rw [← pow_add]
 
-private theorem upper_bound_norm (x : F64) (hfin : x.isFinite) (hbexp : x.biasedExp.val ≥ 1) :
+theorem upper_bound_norm (x : F64) (hfin : x.isFinite) (hbexp : x.biasedExp.val ≥ 1) :
     |x.toRat| < threshQ (x.biasedExp.val + 1) := by
   rw [toRat_abs x hfin]
   have hesig := esig_lt_53 x
@@ -289,12 +289,12 @@ theorem findBiasedExp_correct (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0
 
 /-! ## roundSignificand exactness -/
 
-private theorem binExp_eq (x : F64) :
+theorem binExp_eq (x : F64) :
     (if x.biasedExp.val = 0 then (-1074 : Int) else (x.biasedExp.val : Int) - 1075) =
     x.effectiveBinaryExp := by
   unfold effectiveBinaryExp; simp only [expBias, mantBits]; split <;> omega
 
-private theorem floor_nat_cast (n : Nat) : (n : ℚ).floor = (n : Int) := by
+theorem floor_nat_cast (n : Nat) : (n : ℚ).floor = (n : Int) := by
   change ⌊(↑n : ℚ)⌋ = ↑n; exact Int.floor_natCast n
 
 private theorem sigExact_eq (x : F64) (hfin : x.isFinite) (_hne : x.toRat ≠ 0) :
@@ -310,11 +310,11 @@ private theorem sigExact_eq (x : F64) (hfin : x.isFinite) (_hne : x.toRat ≠ 0)
   · simp only [if_neg hexp]
     exact div_mul_cancel₀ _ (ne_of_gt (by positivity))
 
-private theorem esig_subnormal (x : F64) (h : x.biasedExp.val = 0) :
+theorem esig_subnormal (x : F64) (h : x.biasedExp.val = 0) :
     x.effectiveSignificand = x.mantissa.val := by
   unfold effectiveSignificand; simp [h]
 
-private theorem esig_normal (x : F64) (h : x.biasedExp.val ≠ 0) :
+theorem esig_normal (x : F64) (h : x.biasedExp.val ≠ 0) :
     x.effectiveSignificand = 2^52 + x.mantissa.val := by
   unfold effectiveSignificand; simp [h, mantBits]
 
