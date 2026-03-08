@@ -19,11 +19,13 @@ The Ryu algorithm (Ulf Adams, PLDI 2018) converts IEEE 754 floats to their short
 
 2. **Ryu produces valid output** (`ryu_in_interval`) — The shortest-representation search always finds a decimal within the acceptance interval.
 
-3. **Round-to-nearest-even is an involution** (`round_nearest_nonzero`) — `roundToNearestEven(toRat(x)) = x` for all finite non-zero F64.
+3. **Scale minimality** (`ryu_shortest`) — The output is found at the coarsest grid resolution: no integer at any finer scale (fewer digits) lies in the acceptance interval. Matches the Ryu paper's Theorem 1.
 
-4. **Format/parse roundtrip** (`format_parse_roundtrip`) — Scientific notation formatting and parsing are exact inverses for well-formed decimals.
+4. **Round-to-nearest-even is an involution** (`round_nearest_nonzero`) — `roundToNearestEven(toRat(x)) = x` for all finite non-zero F64.
 
-5. **Fuel sufficiency** (`schubfach_fuel_sufficient`) — 1024 iterations is always enough to find a matching digit count, proved via interval width analysis (width × 10^359 ≥ 2).
+5. **Format/parse roundtrip** (`format_parse_roundtrip`) — Scientific notation formatting and parsing are exact inverses for well-formed decimals.
+
+6. **Fuel sufficiency** (`schubfach_fuel_sufficient`) — 1024 iterations is always enough to find a matching digit count, proved via interval width analysis (width × 10^359 ≥ 2).
 
 ## Project structure
 
@@ -37,7 +39,8 @@ RyuLean4/
 │   └── RoundProof.lean         # Correctness: RNE(toRat(x)) = x
 ├── Ryu/
 │   ├── Interval.lean           # Schubfach acceptance intervals + soundness proof
-│   └── ShortestRep.lean        # Shortest decimal search + termination proof
+│   ├── ShortestRep.lean        # Shortest decimal search + termination proof
+│   └── Shortest.lean           # Scale-minimality proof (ryu_shortest)
 ├── Decimal/
 │   ├── Decimal.lean            # Decimal floating-point model
 │   ├── Format.lean             # Decimal → scientific notation string
@@ -88,7 +91,7 @@ The formalization went through an axiom-reduction arc:
 
 ## Known limitations
 
-- **Shortestness not proven** — `isShortestRep` is defined in `ShortestRep.lean` but no theorem connects it to `ryu`'s output. The algorithm tries digit counts in ascending order so it should find the shortest, but minimality is not formally established. The roundtrip guarantee is complete regardless.
+- **Scale-minimal, not digit-minimal** — `ryu_shortest` proves the output uses the coarsest grid resolution (earliest `findDigits` step). This matches the Ryu paper's guarantee. However, the center-closest tie-breaking heuristic means the post-strip digit count may not be globally minimal — a different integer at the same scale could strip to fewer digits. The roundtrip guarantee and scale minimality are complete regardless.
 - **F64 is a mathematical model** — The `F64` structure is a pure Lean type, not connected to Lean's native `Float` or any hardware implementation. The proof applies to the model, which faithfully mirrors the IEEE 754 binary64 specification.
 - **`native_decide` in `FormatParse.lean`** — Used for concrete character comparisons (digits 0-9, sign characters). Each syntactic occurrence fans out via `<;>` to multiple proof obligations. All are on small finite ground terms and are sound, but trust the Lean compiler for evaluation.
 

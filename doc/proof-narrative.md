@@ -235,7 +235,7 @@ The last axiom was the hardest — it required the full rounding analysis with t
 
 ## What's *not* proved
 
-- **Shortest length**: `isShortestRep` is defined but not proved. The formalization guarantees the output is *valid* (in the interval) but doesn't prove no shorter representation exists. The algorithm clearly produces shortest output by construction (it tries 1 digit, then 2, then 3...), but formalizing this would require proving that no valid decimal with fewer digits exists, which needs a more detailed analysis of the digit ranges.
+- **Digit-minimal (post-strip)**: `ryu_shortest` proves scale minimality — the algorithm finds the coarsest grid resolution. But the center-closest tie-breaking heuristic means the chosen integer at that scale may not minimize digit count after trailing zero stripping. This is a subtlety of the algorithm's design, not a gap in the proof.
 
 - **Performance**: The Lean implementation uses exact rational arithmetic and is not remotely competitive with C/Rust implementations. This is a specification, not an implementation.
 

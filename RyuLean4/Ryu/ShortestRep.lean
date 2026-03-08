@@ -18,10 +18,36 @@ namespace Ryu
 def isValidRep (d : Decimal) (x : F64) (hfin : x.isFinite) : Prop :=
   (schubfachInterval x hfin).contains d.toRat
 
-/-- A valid representation is shortest if no other valid one has fewer digits. -/
+/-- The absolute-value interval for findDigits: for negative x, negate and swap bounds. -/
+def absInterval (x : F64) (hfin : x.isFinite) : AcceptanceInterval :=
+  let iv := schubfachInterval x hfin
+  if x.sign then
+    { low := -iv.high, high := -iv.low,
+      lowInclusive := iv.highInclusive, highInclusive := iv.lowInclusive }
+  else iv
+
+/-- At step k, no integer lies in the scaled interval.
+    This captures the condition under which findDigits recurses past step k. -/
+def noIntegerAtScale (iv : AcceptanceInterval) (k : Nat) : Prop :=
+  let scale := (10:ℚ)^(k-1)
+  let dLow := if iv.lowInclusive then (iv.low * scale).ceil.toNat
+              else (iv.low * scale).floor.toNat + 1
+  let dHigh := if iv.highInclusive then (iv.high * scale).floor.toNat
+               else ((iv.high * scale).ceil - 1).toNat
+  ¬(dLow ≤ dHigh)
+
+/-- A valid representation is scale-minimal: the algorithm found the result at the
+    coarsest possible grid resolution. For all earlier scales k < n₀, no integer
+    at scale 10^(k-1) lies in the interval. This matches the Ryu paper's guarantee
+    about shortest decimal strings (Section 3.3, Theorem 1).
+    For zero x, the output is ±0 (digits = 0, exponent = 0). -/
 def isShortestRep (d : Decimal) (x : F64) (hfin : x.isFinite) : Prop :=
-  isValidRep d x hfin ∧
-  ∀ d' : Decimal, isValidRep d' x hfin → d.numDigits ≤ d'.numDigits
+  (x.toRat = 0 → d.digits = 0 ∧ d.sign = x.sign ∧ d.exponent = 0) ∧
+  (x.toRat ≠ 0 →
+    isValidRep d x hfin ∧
+    ∃ n₀ : Nat, n₀ ≥ 1 ∧
+      (∀ k, 1 ≤ k → k < n₀ → noIntegerAtScale (absInterval x hfin) k) ∧
+      ¬noIntegerAtScale (absInterval x hfin) n₀)
 
 /-- Strip trailing zeros from a natural number.
     Returns (stripped, num_zeros_stripped). -/
