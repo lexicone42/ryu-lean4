@@ -894,6 +894,137 @@ private theorem round_to_N (N : Nat) (sigExact : ℚ)
     rw [if_neg (by omega)]
     omega
 
+/-- If the sigExact inside sigRoundedOf lies in [N - 1/2, N) with N ≥ 2 and (N-1) odd,
+    then sigRoundedOf = N. This is a thin wrapper that unfolds sigRoundedOf and
+    applies round_to_N. -/
+private theorem sigRoundedOf_eq_of_bounds (qAbs : ℚ) (bexp N : Nat)
+    (hN_ge : N ≥ 2) (hN_odd_pred : (N - 1) % 2 = 1)
+    (hlo : (N : ℚ) - 1/2 ≤
+      let binExp : Int := if bexp = 0 then -1074 else (bexp : Int) - 1075
+      if binExp ≥ 0 then qAbs / (2 ^ binExp.toNat : ℚ)
+      else qAbs * (2 ^ (-binExp).toNat : ℚ))
+    (hhi :
+      (let binExp : Int := if bexp = 0 then -1074 else (bexp : Int) - 1075
+      if binExp ≥ 0 then qAbs / (2 ^ binExp.toNat : ℚ)
+      else qAbs * (2 ^ (-binExp).toNat : ℚ)) < N) :
+    sigRoundedOf qAbs bexp = N := by
+  unfold sigRoundedOf
+  simp only [] at hlo hhi ⊢
+  exact round_to_N N _ hlo hhi hN_ge hN_odd_pred
+
+/-- Convert interval lower bound to sigExact lower bound for bexp=1 (subnormal boundary).
+    The interval gives (4·2^52-2)/2^1076 ≤ |q|, and sigExact = |q|·2^1074,
+    so sigExact ≥ (4·2^52-2)/4 = 2^52 - 1/2. -/
+private theorem boundary_sigExact_lo_sub (qAbs : ℚ)
+    (habs_lo : ((4 * 2 ^ 52 - 2 : Nat) : ℚ) / 2 ^ 1076 ≤ qAbs) :
+    (2^52 : ℚ) - 1/2 ≤ qAbs * 2^1074 := by
+  have hscale : ((4 * 2^52 - 2 : Nat) : ℚ) / 2^1076 * 2^1074 = 2^52 - 1/2 := by
+    have h1 : (2:ℚ)^1076 = 2^2 * 2^1074 := by rw [← pow_add]
+    rw [h1, ← div_div, div_mul_cancel₀ _ (by positivity : (2:ℚ)^1074 ≠ 0)]
+    push_cast; norm_num
+  linarith [mul_le_mul_of_nonneg_right habs_lo (show (0:ℚ) ≤ 2^1074 from by positivity)]
+
+/-- Convert threshQ upper bound to sigExact upper bound for bexp=1.
+    threshQ(1) = 1/2^1022, sigExact = |q|·2^1074, so sigExact < 2^52. -/
+private theorem boundary_sigExact_hi_sub (qAbs : ℚ)
+    (hqlt : qAbs < (1:ℚ) / 2^1022) :
+    qAbs * 2^1074 < 2^52 := by
+  have hscale : (1:ℚ) / 2^1022 * 2^1074 = 2^52 := by
+    rw [one_div, inv_mul_eq_div]
+    rw [show (2:ℚ)^1074 = 2^52 * 2^1022 from by rw [← pow_add]]
+    rw [mul_div_cancel_right₀ _ (by positivity : (2:ℚ)^1022 ≠ 0)]
+  linarith [mul_lt_mul_of_pos_right hqlt (show (0:ℚ) < 2^1074 from by positivity)]
+
+/-- Convert interval lower bound to sigExact lower bound for bexp≥2 (normal boundary).
+    In all sub-cases, the interval gives (2^54-1)·scale ≤ |q| and sigExact = |q|/scale',
+    yielding sigExact ≥ (2^54-1)/2 = 2^53 - 1/2. -/
+private theorem boundary_sigExact_lo_norm (bexp : Nat) (qAbs : ℚ) (hbexp : bexp ≥ 2)
+    (habs_lo : (if (bexp : Int) - 1077 ≥ 0
+      then ((2^54 - 1 : Nat) : ℚ) * 2^((bexp : Int) - 1077).toNat
+      else ((2^54 - 1 : Nat) : ℚ) / 2^(-((bexp : Int) - 1077)).toNat) ≤ qAbs) :
+    (2^53 : ℚ) - 1/2 ≤
+      (if ((bexp : Int) - 1076 ≥ 0) then qAbs / (2 ^ ((bexp : Int) - 1076).toNat : ℚ)
+       else qAbs * (2 ^ (-((bexp : Int) - 1076)).toNat : ℚ)) := by
+  by_cases hbinexp_ge : (bexp : Int) - 1076 ≥ 0
+  · simp only [if_pos hbinexp_ge]
+    have htonat : ((bexp : Int) - 1076).toNat = bexp - 1076 := by omega
+    rw [htonat]
+    by_cases hge1077 : (bexp : Int) - 1077 ≥ 0
+    · simp only [if_pos hge1077] at habs_lo
+      have htonat2 : ((bexp : Int) - 1077).toNat = bexp - 1077 := by omega
+      rw [htonat2] at habs_lo
+      rw [le_div_iff₀ (by positivity : (0:ℚ) < 2^(bexp - 1076))]
+      calc ((2:ℚ)^53 - 1/2) * 2^(bexp - 1076)
+          = ((2^54 - 1 : Nat) : ℚ) * 2^(bexp - 1077) := by
+            push_cast
+            rw [show (2:ℚ)^(bexp - 1076) = 2^1 * 2^(bexp - 1077) from by
+              rw [← pow_add]; congr 1; omega]
+            ring
+        _ ≤ qAbs := habs_lo
+    · push_neg at hge1077
+      have hbe_eq : bexp = 1076 := by omega
+      simp only [show ¬((bexp : Int) - 1077 ≥ 0) from by omega, ↓reduceIte] at habs_lo
+      have htonat2 : (-((bexp : Int) - 1077)).toNat = 1077 - bexp := by omega
+      rw [htonat2, hbe_eq] at habs_lo
+      rw [hbe_eq, show 1076 - 1076 = 0 from by omega, pow_zero]
+      simp only [div_one]
+      have : ((2^54 - 1 : Nat) : ℚ) / 2 ^ 1 = 2^53 - 1/2 := by push_cast; norm_num
+      linarith
+  · push_neg at hbinexp_ge
+    simp only [show ¬((bexp : Int) - 1076 ≥ 0) from by omega, ↓reduceIte]
+    have htonat : (-((bexp : Int) - 1076)).toNat = 1076 - bexp := by omega
+    rw [htonat]
+    have he2_neg : ¬((bexp : Int) - 1077 ≥ 0) := by omega
+    simp only [he2_neg, ↓reduceIte] at habs_lo
+    have htonat3 : (-((bexp : Int) - 1077)).toNat = 1077 - bexp := by omega
+    rw [htonat3] at habs_lo
+    have h := mul_le_mul_of_nonneg_right habs_lo (show (0:ℚ) ≤ 2^(1076 - bexp) from by positivity)
+    calc (2^53 : ℚ) - 1/2
+        = ((2^54 - 1 : Nat) : ℚ) / 2^(1077 - bexp) * 2^(1076 - bexp) := by
+          push_cast
+          have h1 : (2:ℚ)^(1077 - bexp) = 2^1 * 2^(1076 - bexp) := by
+            rw [← pow_add]; congr 1; omega
+          rw [h1, ← div_div, div_mul_cancel₀ _ (by positivity : (2:ℚ)^(1076 - bexp) ≠ 0)]
+          norm_num
+      _ ≤ qAbs * 2^(1076 - bexp) := h
+
+/-- Convert threshQ upper bound to sigExact upper bound for bexp≥2.
+    In all sub-cases, threshQ(bexp)·(1/2^binExp) = 2^53, so sigExact < 2^53. -/
+private theorem boundary_sigExact_hi_norm (bexp : Nat) (qAbs : ℚ) (hbexp : bexp ≥ 2)
+    (hexp_lt : bexp < 2047)
+    (hqlt : qAbs < F64.threshQ bexp) :
+    (if ((bexp : Int) - 1076 ≥ 0) then qAbs / (2 ^ ((bexp : Int) - 1076).toNat : ℚ)
+     else qAbs * (2 ^ (-((bexp : Int) - 1076)).toNat : ℚ)) < 2^53 := by
+  by_cases hbinexp_ge : (bexp : Int) - 1076 ≥ 0
+  · simp only [if_pos hbinexp_ge]
+    have htonat : ((bexp : Int) - 1076).toNat = bexp - 1076 := by omega
+    rw [htonat]
+    unfold F64.threshQ at hqlt
+    simp only [show bexp ≥ 1023 from by omega, ↓reduceIte] at hqlt
+    rw [div_lt_iff₀ (by positivity : (0:ℚ) < 2^(bexp - 1076))]
+    calc qAbs < 2^(bexp - 1023) := hqlt
+      _ = 2^53 * 2^(bexp - 1076) := by rw [← pow_add]; congr 1; omega
+  · push_neg at hbinexp_ge
+    simp only [show ¬((bexp : Int) - 1076 ≥ 0) from by omega, ↓reduceIte]
+    have htonat : (-((bexp : Int) - 1076)).toNat = 1076 - bexp := by omega
+    rw [htonat]
+    unfold F64.threshQ at hqlt
+    by_cases hge1023 : bexp ≥ 1023
+    · simp only [show bexp ≥ 1023 from hge1023, ↓reduceIte] at hqlt
+      have h := mul_lt_mul_of_pos_right hqlt (show (0:ℚ) < 2^(1076 - bexp) from by positivity)
+      calc qAbs * 2^(1076 - bexp)
+        _ < 2^(bexp - 1023) * 2^(1076 - bexp) := h
+        _ = 2^53 := by rw [← pow_add]; congr 1; omega
+    · push_neg at hge1023
+      simp only [show ¬(bexp ≥ 1023) from by omega, ↓reduceIte] at hqlt
+      have h := mul_lt_mul_of_pos_right hqlt (show (0:ℚ) < 2^(1076 - bexp) from by positivity)
+      calc qAbs * 2^(1076 - bexp)
+        _ < 1 / 2^(1023 - bexp) * 2^(1076 - bexp) := h
+        _ = 2^53 := by
+            rw [one_div, inv_mul_eq_div]
+            rw [div_eq_iff (by positivity : (0:ℚ) < 2^(1023 - bexp)).ne']
+            rw [← pow_add]; congr 1; omega
+
 private theorem boundary_roundSig (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0)
     (q : ℚ) (hq_ne : q ≠ 0) (hdec : decide (q < 0) = x.sign)
     (hq : (schubfachInterval x hfin).contains q)
@@ -917,117 +1048,33 @@ private theorem boundary_roundSig (x : F64) (hfin : x.isFinite) (hne : x.toRat �
     simp only [hbe1, show 1 - 1 = 0 from by omega]
     suffices hsig : sigRoundedOf |q| 0 = 2^52 by
       rw [hsig]; unfold branchOf; simp
-    unfold sigRoundedOf
-    simp only [show (0:Nat) = 0 from rfl, ↓reduceIte,
-               show ¬((-1074 : Int) ≥ 0) from by omega,
-               show ((-(-1074 : Int)).toNat) = 1074 from by omega]
     have he2_val : (x.biasedExp.val : Int) - 1077 = -1076 := by omega
     rw [he2_val, hbe1] at habs_lo
     simp only [show ¬((1:Nat) > 1) from by omega, ↓reduceIte,
                show ¬((-1076 : Int) ≥ 0) from by omega,
                show ((-(-1076 : Int)).toNat) = 1076 from by omega] at habs_lo
-    have hsig_lo : (2^52 : ℚ) - 1/2 ≤ |q| * 2^1074 := by
-      have hscale : ((4 * 2^52 - 2 : Nat) : ℚ) / 2^1076 * 2^1074 = 2^52 - 1/2 := by
-        have h1 : (2:ℚ)^1076 = 2^2 * 2^1074 := by rw [← pow_add]
-        rw [h1, ← div_div, div_mul_cancel₀ _ (by positivity : (2:ℚ)^1074 ≠ 0)]
-        push_cast; norm_num
-      linarith [mul_le_mul_of_nonneg_right habs_lo (show (0:ℚ) ≤ 2^1074 from by positivity)]
-    rw [hbe1] at hqlt
-    unfold F64.threshQ at hqlt
+    rw [hbe1] at hqlt; unfold F64.threshQ at hqlt
     simp only [show ¬(1 ≥ 1023) from by omega, ↓reduceIte, show 1023 - 1 = 1022 from by omega] at hqlt
-    have hsig_hi : |q| * 2^1074 < 2^52 := by
-      have hscale : (1:ℚ) / 2^1022 * 2^1074 = 2^52 := by
-        rw [one_div, inv_mul_eq_div]
-        rw [show (2:ℚ)^1074 = 2^52 * 2^1022 from by rw [← pow_add]]
-        rw [mul_div_cancel_right₀ _ (by positivity : (2:ℚ)^1022 ≠ 0)]
-      linarith [mul_lt_mul_of_pos_right hqlt (show (0:ℚ) < 2^1074 from by positivity)]
-    exact round_to_N (2^52) (|q| * 2^1074) hsig_lo hsig_hi (by norm_num) (by norm_num)
+    exact sigRoundedOf_eq_of_bounds |q| 0 (2^52) (by norm_num) (by norm_num)
+      (by simp only [↓reduceIte, show ¬((-1074 : Int) ≥ 0) from by omega,
+                      show ((-(-1074 : Int)).toNat) = 1074 from by omega]
+          exact boundary_sigExact_lo_sub |q| habs_lo)
+      (by simp only [↓reduceIte, show ¬((-1074 : Int) ≥ 0) from by omega,
+                      show ((-(-1074 : Int)).toNat) = 1074 from by omega]
+          exact boundary_sigExact_hi_sub |q| hqlt)
   · -- Case biasedExp ≥ 2: roundSignificand(|q|, biasedExp-1)
     have hbe_ge2 : x.biasedExp.val ≥ 2 := by omega
     have hbm1_ne0 : x.biasedExp.val - 1 ≠ 0 := by omega
     suffices hsig : sigRoundedOf |q| (x.biasedExp.val - 1) = 2^53 by
       rw [hsig]; unfold branchOf; simp only [hbm1_ne0, ↓reduceIte]; norm_num
-    unfold sigRoundedOf
-    simp only [hbm1_ne0, ↓reduceIte]
     have hbinexp : ((x.biasedExp.val - 1 : Nat) : Int) - 1075 = (x.biasedExp.val : Int) - 1076 := by omega
-    rw [hbinexp]
     simp only [show x.biasedExp.val > 1 from by omega, ↓reduceIte,
                show (4 * (2:Nat)^52 - 1) = (2^54 - 1 : Nat) from by norm_num] at habs_lo
-    by_cases hbinexp_ge : (x.biasedExp.val : Int) - 1076 ≥ 0
-    · simp only [if_pos hbinexp_ge]
-      have htonat : ((x.biasedExp.val : Int) - 1076).toNat = x.biasedExp.val - 1076 := by omega
-      rw [htonat]
-      by_cases hge1077 : (x.biasedExp.val : Int) - 1077 ≥ 0
-      · simp only [if_pos hge1077] at habs_lo
-        have htonat2 : ((x.biasedExp.val : Int) - 1077).toNat = x.biasedExp.val - 1077 := by omega
-        rw [htonat2] at habs_lo
-        have hsig_lo : (2^53 : ℚ) - 1/2 ≤ |q| / 2^(x.biasedExp.val - 1076) := by
-          rw [le_div_iff₀ (by positivity : (0:ℚ) < 2^(x.biasedExp.val - 1076))]
-          calc ((2:ℚ)^53 - 1/2) * 2^(x.biasedExp.val - 1076)
-              = ((2^54 - 1 : Nat) : ℚ) * 2^(x.biasedExp.val - 1077) := by
-                push_cast
-                rw [show (2:ℚ)^(x.biasedExp.val - 1076) = 2^1 * 2^(x.biasedExp.val - 1077) from by
-                  rw [← pow_add]; congr 1; omega]
-                ring
-            _ ≤ |q| := habs_lo
-        unfold F64.threshQ at hqlt
-        simp only [show x.biasedExp.val ≥ 1023 from by omega, ↓reduceIte] at hqlt
-        have hsig_hi : |q| / 2^(x.biasedExp.val - 1076) < 2^53 := by
-          rw [div_lt_iff₀ (by positivity : (0:ℚ) < 2^(x.biasedExp.val - 1076))]
-          calc |q| < 2^(x.biasedExp.val - 1023) := hqlt
-            _ = 2^53 * 2^(x.biasedExp.val - 1076) := by rw [← pow_add]; congr 1; omega
-        exact round_to_N (2^53) _ hsig_lo hsig_hi (by norm_num) (by norm_num)
-      · push_neg at hge1077
-        have hbe_eq : x.biasedExp.val = 1076 := by omega
-        simp only [show ¬((x.biasedExp.val : Int) - 1077 ≥ 0) from by omega, ↓reduceIte] at habs_lo
-        have htonat2 : (-((x.biasedExp.val : Int) - 1077)).toNat = 1077 - x.biasedExp.val := by omega
-        rw [htonat2, hbe_eq] at habs_lo
-        rw [hbe_eq, show 1076 - 1076 = 0 from by omega, pow_zero]
-        simp only [div_one]
-        have hsig_lo : (2^53 : ℚ) - 1/2 ≤ |q| := by
-          have : ((2^54 - 1 : Nat) : ℚ) / 2 ^ 1 = 2^53 - 1/2 := by push_cast; norm_num
-          linarith
-        unfold F64.threshQ at hqlt
-        simp only [show x.biasedExp.val ≥ 1023 from by omega, ↓reduceIte] at hqlt
-        have hsig_hi : |q| < 2^53 := by
-          rw [hbe_eq] at hqlt; norm_num at hqlt; linarith
-        exact round_to_N (2^53) _ hsig_lo hsig_hi (by norm_num) (by norm_num)
-    · push_neg at hbinexp_ge
-      simp only [show ¬((x.biasedExp.val : Int) - 1076 ≥ 0) from by omega, ↓reduceIte]
-      have htonat : (-((x.biasedExp.val : Int) - 1076)).toNat = 1076 - x.biasedExp.val := by omega
-      rw [htonat]
-      have he2_neg : ¬((x.biasedExp.val : Int) - 1077 ≥ 0) := by omega
-      simp only [he2_neg, ↓reduceIte] at habs_lo
-      have htonat3 : (-((x.biasedExp.val : Int) - 1077)).toNat = 1077 - x.biasedExp.val := by omega
-      rw [htonat3] at habs_lo
-      have hsig_lo : (2^53 : ℚ) - 1/2 ≤ |q| * 2^(1076 - x.biasedExp.val) := by
-        have h := mul_le_mul_of_nonneg_right habs_lo (show (0:ℚ) ≤ 2^(1076 - x.biasedExp.val) from by positivity)
-        calc (2^53 : ℚ) - 1/2
-            = ((2^54 - 1 : Nat) : ℚ) / 2^(1077 - x.biasedExp.val) * 2^(1076 - x.biasedExp.val) := by
-              push_cast
-              have h1 : (2:ℚ)^(1077 - x.biasedExp.val) = 2^1 * 2^(1076 - x.biasedExp.val) := by
-                rw [← pow_add]; congr 1; omega
-              rw [h1, ← div_div, div_mul_cancel₀ _ (by positivity : (2:ℚ)^(1076 - x.biasedExp.val) ≠ 0)]
-              norm_num
-          _ ≤ |q| * 2^(1076 - x.biasedExp.val) := h
-      have hsig_hi : |q| * 2^(1076 - x.biasedExp.val) < 2^53 := by
-        unfold F64.threshQ at hqlt
-        by_cases hge1023 : x.biasedExp.val ≥ 1023
-        · simp only [show x.biasedExp.val ≥ 1023 from hge1023, ↓reduceIte] at hqlt
-          have h := mul_lt_mul_of_pos_right hqlt (show (0:ℚ) < 2^(1076 - x.biasedExp.val) from by positivity)
-          calc |q| * 2^(1076 - x.biasedExp.val)
-            _ < 2^(x.biasedExp.val - 1023) * 2^(1076 - x.biasedExp.val) := h
-            _ = 2^53 := by rw [← pow_add]; congr 1; omega
-        · push_neg at hge1023
-          simp only [show ¬(x.biasedExp.val ≥ 1023) from by omega, ↓reduceIte] at hqlt
-          have h := mul_lt_mul_of_pos_right hqlt (show (0:ℚ) < 2^(1076 - x.biasedExp.val) from by positivity)
-          calc |q| * 2^(1076 - x.biasedExp.val)
-            _ < 1 / 2^(1023 - x.biasedExp.val) * 2^(1076 - x.biasedExp.val) := h
-            _ = 2^53 := by
-                rw [one_div, inv_mul_eq_div]
-                rw [div_eq_iff (by positivity : (0:ℚ) < 2^(1023 - x.biasedExp.val)).ne']
-                rw [← pow_add]; congr 1; omega
-      exact round_to_N (2^53) _ hsig_lo hsig_hi (by norm_num) (by norm_num)
+    exact sigRoundedOf_eq_of_bounds |q| (x.biasedExp.val - 1) (2^53) (by norm_num) (by norm_num)
+      (by simp only [hbm1_ne0, ↓reduceIte, hbinexp]
+          exact boundary_sigExact_lo_norm x.biasedExp.val |q| hbe_ge2 habs_lo)
+      (by simp only [hbm1_ne0, ↓reduceIte, hbinexp]
+          exact boundary_sigExact_hi_norm x.biasedExp.val |q| hbe_ge2 hexp_lt hqlt)
 
 /-! #### Step 4: Assembly -/
 
