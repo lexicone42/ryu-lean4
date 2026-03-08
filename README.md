@@ -9,7 +9,7 @@ theorem full_roundtrip (x : F64) (hfin : x.isFinite) :
     (Decimal.parse (Decimal.format (ryu x hfin))).map Decimal.toF64 = some x
 ```
 
-Converting a float to its shortest decimal string and parsing it back yields the original float — proved for all ~2^64 finite IEEE 754 doubles, with zero axioms and zero `sorry`s.
+Converting a float to a decimal string and parsing it back yields the original float — proved for all ~2^63 finite IEEE 754 doubles, with zero axioms and zero `sorry`s.
 
 ## What this proves
 
@@ -85,6 +85,12 @@ Each stage has its own correctness theorem. The full roundtrip (`FullRoundtrip.l
 The formalization went through an axiom-reduction arc:
 - 4 axioms → 3 → 2 → 1 → **0** across multiple sessions
 - Final axiom eliminated: `schubfach_interval_correct` (acceptance interval soundness)
+
+## Known limitations
+
+- **Shortestness not proven** — `isShortestRep` is defined in `ShortestRep.lean` but no theorem connects it to `ryu`'s output. The algorithm tries digit counts in ascending order so it should find the shortest, but minimality is not formally established. The roundtrip guarantee is complete regardless.
+- **F64 is a mathematical model** — The `F64` structure is a pure Lean type, not connected to Lean's native `Float` or any hardware implementation. The proof applies to the model, which faithfully mirrors the IEEE 754 binary64 specification.
+- **6 `native_decide` uses** — All on concrete character comparisons (digits 0-9, sign characters) in `FormatParse.lean`. These are sound but trust the Lean compiler for evaluation.
 
 ## Related work
 
