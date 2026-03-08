@@ -19,7 +19,7 @@ namespace Decimal
 def zero : Decimal := ⟨false, 0, 0⟩
 
 /-- Count decimal digits in a natural number. -/
-private def countDigits (n : Nat) : Nat :=
+def countDigits (n : Nat) : Nat :=
   if n < 10 then 1
   else 1 + countDigits (n / 10)
 termination_by n
