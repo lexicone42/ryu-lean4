@@ -409,7 +409,7 @@ private theorem width_implies_cond
 -- If at any reachable step k the width condition holds, findDigits succeeds
 private theorem findDigits_succeeds_before
     (iv : AcceptanceInterval) (s : Bool) (lo hi : ℚ)
-    (hlo : 0 < lo) (hhi : lo < hi) (n fuel : Nat) (hn : n ≥ 1)
+    (hlo : 0 < lo) (_hhi : lo < hi) (n fuel : Nat) (_hn : n ≥ 1)
     (k : Nat) (hk_ge : k ≥ n) (hk_fuel : k < n + fuel)
     (hwidth_k : (hi - lo) * (10:ℚ)^(k-1) ≥ 2) :
     (findDigits iv s lo hi n fuel).digits ≠ 0 := by
@@ -466,6 +466,7 @@ private theorem effSig_pos_of_ne_zero (x : F64) (hfin : x.isFinite) (hne : x.toR
   have : x.effectiveSignificand = 0 := by omega
   exact hne (by unfold F64.toRat; rw [if_neg (not_not.mpr hfin)]; simp [this])
 
+set_option exponentiation.threshold 2048 in
 private theorem abs_width_times_ten_pow (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0) :
     let iv := schubfachInterval x hfin
     let absIv := if x.sign then
@@ -514,7 +515,7 @@ private theorem abs_width_times_ten_pow (x : F64) (hfin : x.isFinite) (hne : x.t
       have := ten_pow_ge_two_pow_three_mul 359
       rw [show 3 * 359 = 1077 from by norm_num] at this; exact this
     have h2_1077 : (2:ℚ)^1077 = 2 * (2:ℚ)^1076 := by
-      rw [show (1077:Nat) = 1076 + 1 from by norm_num, pow_succ]; ring
+      rw [show 1077 = 1076 + 1 from by omega, pow_succ]; ring
     calc 2 * (2:ℚ)^(-e2).toNat
         ≤ 2 * (2:ℚ)^1076 := mul_le_mul_of_nonneg_left h2_bound (by norm_num)
       _ = (2:ℚ)^1077 := h2_1077.symm

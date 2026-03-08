@@ -13,6 +13,7 @@ import Mathlib.Tactic.Linarith
 
 set_option exponentiation.threshold 2048
 set_option maxRecDepth 8192
+set_option linter.unusedSimpArgs false
 
 namespace Ryu
 
@@ -581,7 +582,7 @@ private theorem interval_abs_bounds (x : F64) (hfin : x.isFinite)
       · simp only [if_neg he2] at hhi ⊢; split at hhi <;> linarith
   · have hq_neg := neg_of_sign_true q hdec hs
     rw [abs_of_neg hq_neg]
-    simp only [hs, Bool.true_eq_false, ite_false, ite_true] at hq
+    simp only [hs, Bool.true_eq_false, ite_true] at hq
     obtain ⟨hlo, hhi⟩ := hq
     constructor
     · by_cases he2 : x.effectiveBinaryExp - 2 ≥ 0
@@ -659,7 +660,7 @@ private theorem scaleN_lt_threshQ_succ (w : Nat) (be : Nat) (hw : (w : ℚ) < 2^
 
 /-! #### Step 1: biasedExp ≥ 1 -/
 
-private theorem boundary_bexp_ge_one (x : F64) (hfin : x.isFinite) (hne : x.toRat ≠ 0)
+private theorem boundary_bexp_ge_one (x : F64) (hfin : x.isFinite) (_hne : x.toRat ≠ 0)
     (q : ℚ) (hq_ne : q ≠ 0) (hdec : decide (q < 0) = x.sign)
     (hq : (schubfachInterval x hfin).contains q)
     (hfbe_ne : F64.findBiasedExp |q| ≠ x.biasedExp.val) :
