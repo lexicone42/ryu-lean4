@@ -9,7 +9,7 @@ theorem full_roundtrip (x : F64) (hfin : x.isFinite) :
     (Decimal.parse (Decimal.format (ryu x hfin))).map Decimal.toF64 = some x
 ```
 
-Converting a float to a decimal string and parsing it back yields the original float — proved for all ~2^63 finite IEEE 754 doubles, with zero axioms and zero `sorry`s.
+Converting a float to a decimal string and parsing it back yields the original float — proved for all finite IEEE 754 doubles (2047 × 2^53 values), with zero axioms and zero `sorry`s.
 
 ## What this proves
 

@@ -95,7 +95,7 @@ theorem schubfach_interval_correct (x : F64) (hfin : x.isFinite)
     F64.roundToNearestEven q = x
 ```
 
-This is the mathematical heart of the formalization — the claim that the Schubfach interval is *sound*. The proof was the last axiom eliminated and required ~1000 lines.
+This is the mathematical heart of the formalization — the claim that the Schubfach interval is *sound*. The proof was the last axiom eliminated and required ~1100 lines.
 
 **Proof structure:**
 
@@ -137,6 +137,17 @@ Starting at `n = 1` digit, the algorithm scales the interval to `[lo × 10^(n-1)
 - `findDigits_well_formed` — The result has no trailing zeros (ensured by `stripTrailingZeros`).
 
 - `schubfach_fuel_sufficient` — 1024 iterations always suffice. The proof shows that `(hi - lo) × 10^359 ≥ 2` for all finite non-zero F64, which means by digit count 360, the scaled interval width is ≥ 2, guaranteeing at least one integer inside. The bound 359 comes from the minimum interval width (achieved at subnormal floats with `e2 = -1076`) and the relationship `10^359 ≥ 2^1077 > 2 × 2^1076`.
+
+### Scale minimality (Ryu paper Theorem 1)
+
+```lean
+theorem ryu_shortest (x : F64) (hfin : x.isFinite) :
+    isShortestRep (ryu x hfin) x hfin
+```
+
+The output is found at the coarsest grid resolution: for all earlier scales `k < n₀`, no integer at scale `10^(k-1)` lies in the acceptance interval. The key lemma `findDigits_step_info` shows that `findDigits` tries steps in order and only recurses past step `k` when no integer fits at that scale. The proof is structural induction on fuel, with `noIntegerAtScale` capturing the condition under which `findDigits` takes the recursive branch.
+
+Note: this is *scale minimality*, not digit minimality. The center-closest tie-breaking heuristic may pick an integer whose post-strip digit count is not globally minimal. See "What's not proved" below.
 
 ### Ryu roundtrip composition
 
@@ -216,22 +227,22 @@ The formalization was built incrementally, with axioms standing in for unproved 
 | `schubfach_fuel_sufficient` | 1 | 1024 iterations always suffice |
 | `schubfach_interval_correct` | **0** | Acceptance interval soundness |
 
-The last axiom was the hardest — it required the full rounding analysis with tie-breaking, sign handling, exponent recovery, and significand scaling. The proof is ~1000 lines and constitutes about 40% of the total formalization.
+The last axiom was the hardest — it required the full rounding analysis with tie-breaking, sign handling, exponent recovery, and significand scaling. The proof is ~1100 lines and constitutes about 35% of the total formalization.
 
 ## Proof statistics
 
 | Component | Lines | Key technique |
 |-----------|-------|---------------|
-| F64 model + classification | 174 | Dependent types (Fin), case analysis |
-| Rational interpretation | 56 | Sign × significand × 2^exp decomposition |
-| Round-to-nearest-even | 78 | Iterative search + floor/ceiling |
-| Rounding correctness | 388 | Bounds reasoning, omega, floor/ceil |
-| Acceptance intervals | 1106 | Scaling lemmas, tie-breaking analysis |
-| Shortest decimal search | 684 | Fuel induction, interval width |
-| Decimal model + format/parse | 175 | Recursive descent, accumulator |
+| F64 model + classification | 171 | Dependent types (Fin), case analysis |
+| Rational interpretation | 55 | Sign × significand × 2^exp decomposition |
+| Round-to-nearest-even | 77 | Iterative search + floor/ceiling |
+| Rounding correctness | 387 | Bounds reasoning, omega, floor/ceil |
+| Acceptance intervals | 1153 | Scaling lemmas, tie-breaking, bridge lemmas |
+| Shortest decimal search + minimality | 790 | Fuel induction, interval width, scale minimality |
+| Decimal model + format/parse | 172 | Recursive descent, accumulator |
 | Format/parse roundtrip | 451 | 8-layer inversion |
 | Full roundtrip | 28 | 5-line composition |
-| **Total** | **~3140** | **Zero axioms, zero sorrys** |
+| **Total** | **~3280** | **Zero axioms, zero sorrys** |
 
 ## What's *not* proved
 
